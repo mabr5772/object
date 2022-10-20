@@ -1,0 +1,69 @@
+#include <Adafruit_NeoPixel.h>
+
+// Which pin on the Arduino is connected to the NeoPixels?
+// On a Trinket or Gemma we suggest changing this to 1:
+#define LED_PIN 3
+const int buzzer = 5;
+int soundSensor = 4;
+// How many NeoPixels are attached to the Arduino?
+#define LED_COUNT 7
+
+// Base color
+double r = 10.0;
+double g = 0.0;
+double b = 11.0;
+
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+void setup() {
+  pinMode(soundSensor, INPUT);
+  pinMode(buzzer, OUTPUT);
+  Serial.begin(9600); 
+
+
+  //strip.begin();            // INITIALIZE NeoPixel strip object (REQUIRED)
+  strip.show();             // Turn OFF all pixels ASAP
+  strip.setBrightness(50);  // Set BRIGHTNESS to about 1/5 (max = 255)
+}
+
+void loop() {
+  strip.clear();  //   Set all pixels in RAM to 0 (off)
+
+  int statusSensor = analogRead(soundSensor);
+  if (statusSensor == 1) {
+    analogWrite(buzzer, HIGH); // turn on Piezo Buzzer
+    strip.setBrightness(255);  // Set BRIGHTNESS to about 1/5 (max = 255)
+    double r1 = 0.0;
+    double g1 = 0.0;
+    double b1 = 255.0;
+    int local_r = r1;
+    for (int count = 0; count < strip.numPixels(); count += 1) {
+      local_r += 40;
+      strip.setPixelColor(count, strip.Color(local_r, g1, b1));
+    }
+  } else {
+    strip.setBrightness(50);  // Set BRIGHTNESS to about 1/5 (max = 255)
+    analogWrite(buzzer, LOW);
+    int local_r = r;
+    for (int count = 0; count < strip.numPixels(); count += 1) {
+      local_r += 5;
+      strip.setPixelColor(count, strip.Color(local_r, g, b));
+    }
+    r += 0.1;
+    g += 0.008;
+    b += 0.01;
+
+    r = limit_color(r);
+    g = limit_color(g);
+    b = limit_color(b);
+  }
+  strip.show();
+}
+
+double limit_color(double colorValue) {
+  if (colorValue > 255) {
+    return 0;
+  } else {
+    return colorValue;
+  }
+}
