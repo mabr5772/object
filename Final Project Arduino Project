@@ -1,0 +1,95 @@
+#define USE_ARDUINO_INTERRUPTS false  // Set-up low-level interrupts for most acurate BPM math.
+
+#include <PulseSensorPlayground.h>
+
+#include <Adafruit_NeoPixel.h>
+#ifdef __AVR__
+#include <avr/power.h>  // Required for 16 MHz Adafruit Trinket
+#endif
+
+#define VIBRATION_PIN 16
+
+// Which pin on the Arduino is connected to the NeoPixels?
+#define LED_PIN 3     // On
+#define NUMPIXELS 150  // Popular NeoPixel ring size
+
+Adafruit_NeoPixel pixels(NUMPIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+const int HEART_PIN = A0;
+const int THRESHOLD = 500;
+const int OUTPUT_TYPE = SERIAL_PLOTTER;
+
+PulseSensorPlayground pulseSensor;
+
+byte samplesUntilReport;
+const byte SAMPLES_PER_SERIAL_SAMPLE = 10;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(VIBRATION_PIN, OUTPUT);
+
+// Setup the LEDS
+#if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
+  clock_prescale_set(clock_div_1);
+#endif
+  // END of Trinket-specific code.
+  pixels.begin();  // INITIALIZE NeoPixel strip object (REQUIRED)
+
+  // setup heartbeat sensor
+  pulseSensor.analogInput(HEART_PIN);
+
+  pulseSensor.setSerial(Serial);
+  pulseSensor.setOutputType(OUTPUT_TYPE);
+  pulseSensor.setThreshold(THRESHOLD);
+
+  // Skip the first SAMPLES_PER_SERIAL_SAMPLE in the loop().
+  samplesUntilReport = SAMPLES_PER_SERIAL_SAMPLE;
+
+  if (!pulseSensor.begin()) {
+    // failed to init pulse sensor
+
+    // just hang the program
+    Serial.println("Pulse sensor failed to start");
+    for (;;) {}
+  }
+}
+
+int vibration_pulse = 0;
+
+void loop() {
+  // get pulsesensor output to serial (so we can watch it)
+  if (pulseSensor.sawNewSample()) {
+    pixels.clear();
+
+    if (--samplesUntilReport == (byte)0) {
+      samplesUntilReport = SAMPLES_PER_SERIAL_SAMPLE;
+
+      pulseSensor.outputSample();
+
+      /*
+         At about the beginning of every heartbeat,
+         report the heart rate and inter-beat-interval.
+      */
+      if (pulseSensor.sawStartOfBeat()) {
+        pulseSensor.outputBeat();
+        // Do something when we detect a heartbeat
+        for (int i = 0; i < NUMPIXELS; i++) {
+          
+          pixels.setPixelColor(i, pixels.Color(0, 0, 230));
+        }
+
+        // Start vibration
+        vibration_pulse = 50;
+      }
+    }
+    // do things here that take ~ a millisecond
+    pixels.show();  // Send the updated pixel colors to the hardware.
+
+    if (vibration_pulse >= 0) {
+      vibration_pulse = vibration_pulse - 1;
+      digitalWrite(VIBRATION_PIN, HIGH);
+    } else {
+      digitalWrite(VIBRATION_PIN, LOW);
+    }
+  }
+}
